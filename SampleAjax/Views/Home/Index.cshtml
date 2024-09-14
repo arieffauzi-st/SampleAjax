@@ -1,0 +1,192 @@
+﻿@{
+    ViewData["Title"] = "Product Management";
+}
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+
+<h3 class="alert alert-primary">Product Management</h3>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="list-group">
+            <a href="#" class="list-group-item list-group-item-action" id="btnlist">Product List</a>
+            <a href="#" class="list-group-item list-group-item-action" id="btnsearch">Search Product</a>
+            <a href="#" class="list-group-item list-group-item-action" id="btncreate">Add New Product</a>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div id="content">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Load product list by default
+        loadProductList();
+
+        $("#btnlist").click(loadProductList);
+        $("#btnsearch").click(loadSearchForm);
+        $("#btncreate").click(loadCreateForm);
+    });
+
+    function loadProductList() {
+        $.ajax({
+            type: "GET",
+            url: "/Default/ProductList/",
+            success: function (response) {
+                let data = JSON.parse(response);
+                let tableHtml = "<table class='table table-bordered'><thead><tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead><tbody>";
+                
+                $.each(data, function(index, product) {
+                    tableHtml += `<tr>
+                        <td>${product.ProductId}</td>
+                        <td>${product.Name}</td>
+                        <td>${product.Price}</td>
+                        <td>${product.Stock}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="loadEditForm(${product.ProductId})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.ProductId})">Delete</button>
+                        </td>
+                    </tr>`;
+                });
+                
+                tableHtml += "</tbody></table>";
+                $("#content").html(tableHtml);
+            }
+        });
+    }
+
+    function loadSearchForm() {
+        let searchHtml = `
+            <h4>Search Product</h4>
+            <input type="text" id="searchProductId" class="form-control" placeholder="Enter Product ID">
+            <button class="btn btn-primary mt-2" onclick="searchProduct()">Search</button>
+            <div id="searchResult" class="mt-3"></div>
+        `;
+        $("#content").html(searchHtml);
+    }
+
+    function searchProduct() {
+        let id = $("#searchProductId").val();
+        $.ajax({
+            type: "GET",
+            url: "/Default/GetProduct/" + id,
+            success: function (response) {
+                let product = JSON.parse(response);
+                if (!product) { // Check if product is not found
+                    $("#searchResult").html("<p class='text-danger'>Product not found</p>");
+                    return; // Exit the function if not found
+                }
+                let resultHtml = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${product.Name}</h5>
+                            <p class="card-text">Price: ${product.Price}</p>
+                            <p class="card-text">Stock: ${product.Stock}</p>
+                            <button class="btn btn-warning" onclick="loadEditForm(${product.ProductId})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteProduct(${product.ProductId})">Delete</button>
+                        </div>
+                    </div>
+                `;
+                $("#searchResult").html(resultHtml);
+            },
+            error: function() {
+                $("#searchResult").html("<p class='text-danger'>Product not found</p>");
+            }
+        });
+    }
+
+    function loadCreateForm() {
+        let createHtml = `
+            <h4>Add New Product</h4>
+            <input type="text" id="newName" class="form-control mb-2" placeholder="Product Name">
+            <input type="number" id="newPrice" class="form-control mb-2" placeholder="Price">
+            <input type="number" id="newStock" class="form-control mb-2" placeholder="Stock">
+            <button class="btn btn-success" onclick="createProduct()">Add Product</button>
+        `;
+        $("#content").html(createHtml);
+    }
+
+    function createProduct() {
+        let productValues = {
+            Name: $("#newName").val(),
+            Price: $("#newPrice").val(),
+            Stock: $("#newStock").val()
+        };
+
+        $.ajax({
+            type: "POST",
+            url: "/Default/CreateProduct/",
+            data: productValues,
+            success: function (response) {
+                swal("Success", "Product added successfully!", "success");
+                loadProductList();
+            }
+        });
+    }
+
+    function loadEditForm(id) {
+        $.ajax({
+            type: "GET",
+            url: "/Default/GetProduct/" + id,
+            success: function (response) {
+                let product = JSON.parse(response);
+                let editHtml = `
+                    <h4>Edit Product</h4>
+                    <input type="hidden" id="editId" value="${product.ProductId}">
+                    <input type="text" id="editName" class="form-control mb-2" value="${product.Name}">
+                    <input type="number" id="editPrice" class="form-control mb-2" value="${product.Price}">
+                    <input type="number" id="editStock" class="form-control mb-2" value="${product.Stock}">
+                    <button class="btn btn-primary" onclick="updateProduct()">Update Product</button>
+                `;
+                $("#content").html(editHtml);
+            }
+        });
+    }
+
+    function updateProduct() {
+        let values = {
+            ProductId: $("#editId").val(),
+            Name: $("#editName").val(),
+            Price: $("#editPrice").val(),
+            Stock: $("#editStock").val()
+        };
+
+        $.ajax({
+            type: "POST",
+            url: "/Default/UpdateProduct/",
+            data: values,
+            success: function () {
+                swal("Success", "Product updated successfully!", "success");
+                loadProductList();
+            }
+        });
+    }
+
+    function deleteProduct(id) {
+        swal({
+            title: "Are you sure?",
+            text: "Once deleted, you will not be able to recover this product!",
+            icon: "warning",
+            buttons: true,
+            dangerMode: true,
+        })
+        .then((willDelete) => {
+            if (willDelete) {
+                $.ajax({
+                    url: "/Default/DeleteProduct/" + id,
+                    type: "POST",
+                    success: function () {
+                        swal("Product has been deleted!", {
+                            icon: "success",
+                        });
+                        loadProductList();
+                    }
+                });
+            }
+        });
+    }
+</script>
